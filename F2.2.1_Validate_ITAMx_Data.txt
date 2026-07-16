@@ -1,0 +1,96 @@
+Main
+========
+BLOCK 'error'
+ON BLOCK ERROR
+    CALL send_error
+    THROW ERROR
+END
+    Database.Connect ConnectionString: $'''Provider=SQLOLEDB.1;Password=!t1l-User;Persist Security Info=True;User ID=itil-user;Initial Catalog=ITAMX_DB;Data Source=ITAMX-DB\\ITAM,59156''' Connection=> SQLConnection
+    Database.ExecuteSqlStatement.Execute Connection: SQLConnection Statement: $'''SELECT * FROM itilview
+WHERE (GroupDesc IS NOT NULL OR GroupDesc = \'\') AND (Item_Serial IS NOT NULL OR Item_Serial = \'\') AND (Contract_Id IS NOT NULL OR Contract_Id = \'\')''' Timeout: 30 Result=> QueryResult1
+    Database.ExecuteSqlStatement.Execute Connection: SQLConnection Statement: $'''SELECT * FROM itilview
+WHERE (GroupDesc IS NULL OR GroupDesc = \'\') OR (Item_Serial IS NULL OR Item_Serial = \'\') OR (Contract_Id IS NULL OR Contract_Id = \'\')''' Timeout: 30 Result=> QueryResult2
+    File.Copy Files: $'''D:\\PEA_ServiceDesk\\Template\\yyyy-MM-dd_ITAMx_NoUpdate_Asset.xlsx''' Destination: $'''D:\\PEA_ServiceDesk\\temp''' IfFileExists: File.IfExists.Overwrite CopiedFiles=> CopiedFiles
+    File.Copy Files: $'''D:\\PEA_ServiceDesk\\Template\\yyyy-MM-dd_ITAMx_Update_Asset.xlsx''' Destination: $'''D:\\PEA_ServiceDesk\\temp''' IfFileExists: File.IfExists.Overwrite CopiedFiles=> CopiedFiles2
+    DateTime.GetCurrentDateTime.Windows DateTimeFormat: DateTime.DateTimeFormat.DateAndTime TimeZoneLocation: DateTime.TimeZoneLocation.SEAsiaStandardTime CurrentDateTime=> CurrentDateTime
+    Text.ConvertDateTimeToText.FromCustomDateTime DateTime: CurrentDateTime CustomFormat: $'''yyyy-MM''' Result=> FormattedDateTime
+    Excel.LaunchExcel.LaunchAndOpenUnderExistingProcess Path: $'''D:\\PEA_ServiceDesk\\temp\\yyyy-MM-dd_ITAMx_Update_Asset.xlsx''' Visible: False ReadOnly: False UseMachineLocale: False Instance=> ExcelInstance
+    Excel.WriteToExcel.WriteCell Instance: ExcelInstance Value: QueryResult1.ColumnHeadersRow Column: 1 Row: 1
+    ON ERROR
+
+    END
+    Excel.WriteToExcel.WriteCell Instance: ExcelInstance Value: QueryResult1 Column: 1 Row: 2
+    ON ERROR
+
+    END
+    Excel.CloseExcel.CloseAndSave Instance: ExcelInstance
+    Excel.LaunchExcel.LaunchAndOpenUnderExistingProcess Path: $'''D:\\PEA_ServiceDesk\\temp\\yyyy-MM-dd_ITAMx_NoUpdate_Asset.xlsx''' Visible: False ReadOnly: False UseMachineLocale: False Instance=> ExcelInstance2
+    Excel.WriteToExcel.WriteCell Instance: ExcelInstance2 Value: QueryResult2.ColumnHeadersRow Column: 1 Row: 1
+    ON ERROR
+
+    END
+    Excel.WriteToExcel.WriteCell Instance: ExcelInstance2 Value: QueryResult2 Column: 1 Row: 2
+    ON ERROR
+
+    END
+    Excel.CloseExcel.CloseAndSave Instance: ExcelInstance2
+    File.RenameFiles.Rename Files: $'''D:\\PEA_ServiceDesk\\temp\\yyyy-MM-dd_ITAMx_Update_Asset.xlsx''' NewName: $'''%FormattedDateTime%_ITAMx_Update_Asset''' KeepExtension: True IfFileExists: File.IfExists.Overwrite
+    File.RenameFiles.Rename Files: $'''D:\\PEA_ServiceDesk\\temp\\yyyy-MM-dd_ITAMx_NoUpdate_Asset.xlsx''' NewName: $'''%FormattedDateTime%_ITAMx_NoUpdate_Asset''' KeepExtension: True IfFileExists: File.IfExists.Overwrite
+    SET STR_password TO $'''wvmug:viN;b=25'''
+    FTP.OpenSecureConnection.ConnectWithFtpsExplicit Host: $'''servicereport.pea.co.th''' Port: 21 ActiveMode: False Username: $'''itservicedesk''' Password: STR_password AcceptUntrustedCertificates: False Timeout: 30 SftpConnection=> SftpConnection
+    DISABLE FTP.OpenSecureConnection.ConnectWithFtpsExplicit Host: $'''servicereport.pea.co.th''' Port: 21 ActiveMode: False Username: $'''itservicedesk''' Password: P'AQAAANCMnd8BFdERjHoAwE/Cl+sBAAAAIEmZxNcivkyADgaq2DuCXQQAAAACAAAAAAAQZgAAAAEAACAAAABylEzN/Uls/jSTKQrpwzv2vBpxUjyXMitAoQKPIELZygAAAAAOgAAAAAIAACAAAACG966B2Y98IAIYaj3815ZGvfioBQ+hd5v0YfZJvrtp6SAAAABgqOXB5p3RxkndIsJTL2i9aVkboMCDCJnvcFzF9li0Y0AAAACCKt/9HjBRFKkCXZishVPY+aIJGZ6MTvS7AvJxyoySqMM0RhY3UXZ6bciC5fm9Dahv0xbeCwzIJiDpgTpyVjgJ' AcceptUntrustedCertificates: False Timeout: 30 SftpConnection=> SftpConnection
+    Folder.GetFiles Folder: $'''D:\\PEA_ServiceDesk\\temp''' FileFilter: $'''*.xlsx''' IncludeSubfolders: False FailOnAccessDenied: True SortBy1: Folder.SortBy.NoSort SortDescending1: False SortBy2: Folder.SortBy.NoSort SortDescending2: False SortBy3: Folder.SortBy.NoSort SortDescending3: False Files=> Files
+    LOOP FOREACH CurrentItem IN Files
+        FTP.UploadFiles Connection: SftpConnection Files: CurrentItem RemoteLocation: $'''/ITAMx_Data''' TransferType: FTP.FtpTransferType.Auto IfFileExists: FTP.IfFtpFileExists.Overwrite
+        FTP.UploadFiles Connection: SftpConnection Files: CurrentItem RemoteLocation: $'''/ITAMx_Data''' TransferType: FTP.FtpTransferType.Auto IfFileExists: FTP.IfFtpFileExists.Overwrite
+        IF Contains(CurrentItem, $'''ITAMx_Update''', False) THEN
+            File.RenameFiles.Rename Files: $'''D:\\PEA_ServiceDesk\\temp\\%FormattedDateTime%_ITAMx_Update_Asset.xlsx''' NewName: $'''ITAMx_Update_Asset''' KeepExtension: True IfFileExists: File.IfExists.Overwrite
+            FTP.UploadFiles Connection: SftpConnection Files: $'''D:\\PEA_ServiceDesk\\temp\\ITAMx_Update_Asset.xlsx''' RemoteLocation: $'''/ITAMx_Data_Latest''' TransferType: FTP.FtpTransferType.Auto IfFileExists: FTP.IfFtpFileExists.Overwrite
+        END
+    END
+    File.Move Files: $'''D:\\PEA_ServiceDesk\\temp\\ITAMx_Update_Asset.xlsx''' Destination: $'''D:\\PEA_ServiceDesk\\Email_Status''' IfFileExists: File.IfExists.Overwrite MovedFiles=> MovedFiles
+    File.Delete Files: $'''D:\\PEA_ServiceDesk\\temp\\%FormattedDateTime%_ITAMx_NoUpdate_Asset.xlsx'''
+END
+================================================================================================
+send_error
+=========================
+File.Delete Files: $'''C:\\Users\\itservicedesk\\Desktop\\error_itamx.jpg'''
+    ON ERROR
+
+    END
+Workstation.TakeScreenshot.TakeScreenshotAndSaveToFile File: $'''C:\\Users\\itservicedesk\\Desktop\\error_itamx.jpg''' ImageFormat: System.ImageFormat.Jpg
+    ON ERROR
+
+    END
+ERROR => LastError
+Excel.LaunchExcel.LaunchAndOpenUnderExistingProcess Path: $'''D:\\PEA_ServiceDesk\\master_config\\config_file.xlsx''' Visible: False ReadOnly: True UseMachineLocale: False Instance=> ExcelInstance2
+Excel.ReadFromExcel.ReadCell Instance: ExcelInstance2 StartColumn: $'''B''' StartRow: 2 GetCellContentsMode: Excel.GetCellContentsMode.TypedValues CellValue=> ExcelData2
+Excel.CloseExcel.Close Instance: ExcelInstance2
+DateTime.GetCurrentDateTime.Windows DateTimeFormat: DateTime.DateTimeFormat.DateAndTime TimeZoneLocation: DateTime.TimeZoneLocation.SEAsiaStandardTime CurrentDateTime=> CurrentDateTime
+Text.ConvertDateTimeToText.FromCustomDateTime DateTime: CurrentDateTime CustomFormat: $'''dd/MM/yyyy HH:mm:ss''' Result=> SendmailDateTime
+Outlook.Launch Instance=> OutlookInstance
+Outlook.SendEmailThroughOutlook.SendEmail Instance: OutlookInstance Account: $'''itil018@pea.co.th''' SendTo: ExcelData2 Subject: $'''Error : Validate_ITAMx_Data''' Body: $'''Error itamx
+Sent Date : %SendmailDateTime%
+Error In : 
+-- %LastError.Location%
+-- %LastError.Message%
+-- %LastError.ErrorDetails%
+''' IsBodyHtml: False IsDraft: False Attachments: $'''C:\\Users\\itservicedesk\\Desktop\\error_itamx.jpg'''
+    ON ERROR
+        SET NewVar TO 1
+    END
+IF NewVar = 1 THEN
+    Outlook.SendEmailThroughOutlook.SendEmail Instance: OutlookInstance Account: $'''itil018@pea.co.th''' SendTo: ExcelData2 Subject: $'''Error : Validate_ITAMx_Data''' Body: $'''Error itamx
+Sent Date : %SendmailDateTime%
+Error In : 
+-- %LastError.Location%
+-- %LastError.Message%
+-- %LastError.ErrorDetails%
+''' IsBodyHtml: False IsDraft: False
+END
+WAIT 6
+Outlook.Close Instance: OutlookInstance
+File.Delete Files: $'''C:\\Users\\itservicedesk\\Desktop\\error_itamx.jpg'''
+    ON ERROR
+
+    END

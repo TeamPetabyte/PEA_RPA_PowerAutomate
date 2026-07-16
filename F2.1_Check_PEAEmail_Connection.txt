@@ -1,0 +1,126 @@
+Main
+=================================================================================================
+BLOCK 'error'
+ON BLOCK ERROR
+    CALL send_error
+    THROW ERROR
+END
+    CALL 'set'
+    Excel.LaunchExcel.LaunchAndOpenUnderExistingProcess Path: $'''D:\\PEA_ServiceDesk\\master_config\\check_month.xlsx''' Visible: False ReadOnly: True UseMachineLocale: False Instance=> ExcelInstance2
+    Excel.ReadFromExcel.ReadCell Instance: ExcelInstance2 StartColumn: 1 StartRow: Month_num GetCellContentsMode: Excel.GetCellContentsMode.TypedValues CellValue=> ExcelData
+    Excel.CloseExcel.Close Instance: ExcelInstance2
+    IF (File.IfFile.DoesNotExist File: $'''D:\\PEA_ServiceDesk\\Email_Status\\%Formattedyear%_Email_Status.xlsx''') THEN
+        File.Copy Files: $'''D:\\PEA_ServiceDesk\\Template\\YYYY_Email_Status.xlsx''' Destination: $'''D:\\PEA_ServiceDesk\\Email_Status''' IfFileExists: File.IfExists.Overwrite CopiedFiles=> CopiedFiles
+        File.RenameFiles.Rename Files: $'''D:\\PEA_ServiceDesk\\Email_Status\\YYYY_Email_Status.xlsx''' NewName: $'''%Formattedyear%_Email_Status''' KeepExtension: True IfFileExists: File.IfExists.Overwrite RenamedFiles=> RenamedFiles
+    END
+    Excel.LaunchExcel.LaunchAndOpenUnderExistingProcess Path: $'''D:\\PEA_ServiceDesk\\Email_Status\\2026_Email_Status.xlsx''' Visible: True ReadOnly: False UseMachineLocale: False Instance=> ExcelInstance
+    Excel.GetAllWorksheets Instance: ExcelInstance Worksheets=> SheetNames_List
+    LOOP FOREACH CurrentItem IN SheetNames_List
+        IF CurrentItem = ExcelData THEN
+            SET monthSheet TO 1
+        END
+    END
+    IF monthSheet = 2 THEN
+        Excel.AddWorksheet Instance: ExcelInstance Name: ExcelData WorksheetPosition: Excel.WorksheetPosition.Last
+        Excel.WriteToExcel.WriteCell Instance: ExcelInstance Value: ExcelData2 Column: 1 Row: 1
+    END
+    Excel.DeleteWorksheet.DeleteWorksheetByName Instance: ExcelInstance Name: $'''Sheet1'''
+    ON ERROR
+
+    END
+    SET check_erroe TO 0
+    BLOCK 'check mail'
+ON BLOCK ERROR
+    SET str_error TO 1
+    NEXT ACTION
+END
+        Outlook.Launch Instance=> OutlookInstance
+        Outlook.RetrieveEmailMessages.RetrieveEmails Instance: OutlookInstance Account: $'''servicedesk-event@pea.co.th''' MailFolder: $'''Waiting''' EmailsToRetrieve: Outlook.RetrieveMessagesMode.All MarkAsRead: True ReadBodyAsHtml: False Messages=> RetrievedEmails
+        ON ERROR
+            SET check_erroe TO 1
+        END
+        Outlook.Close Instance: OutlookInstance
+    END
+    IF str_error = 1 THEN
+        Outlook.Launch Instance=> OutlookInstance
+        Outlook.RetrieveEmailMessages.RetrieveEmails Instance: OutlookInstance Account: $'''servicedesk-event@pea.co.th''' MailFolder: $'''Waiting''' EmailsToRetrieve: Outlook.RetrieveMessagesMode.All MarkAsRead: True ReadBodyAsHtml: False Messages=> RetrievedEmails
+        ON ERROR
+            SET check_erroe TO 1
+        END
+        Outlook.Close Instance: OutlookInstance
+    END
+    ERROR => LastError
+    Excel.SetActiveWorksheet.ActivateWorksheetByName Instance: ExcelInstance Name: ExcelData
+    Excel.GetFirstFreeColumnRow Instance: ExcelInstance FirstFreeColumn=> FirstFreeColumn FirstFreeRow=> FirstFreeRow
+    Excel.WriteToExcel.WriteCell Instance: ExcelInstance Value: $'''\'%dat_time%''' Column: 1 Row: FirstFreeRow
+    Excel.WriteToExcel.WriteCell Instance: ExcelInstance Value: $'''Connect Mailbox''' Column: 2 Row: FirstFreeRow
+    IF check_erroe = 1 THEN
+        Excel.WriteToExcel.WriteCell Instance: ExcelInstance Value: $'''Failed''' Column: 3 Row: FirstFreeRow
+        Excel.WriteToExcel.WriteCell Instance: ExcelInstance Value: LastError.Message Column: 4 Row: FirstFreeRow
+        Excel.WriteToExcel.WriteCell Instance: ExcelInstance Value: LastError.ErrorDetails Column: 5 Row: FirstFreeRow
+    END
+    IF check_erroe = 0 THEN
+        Excel.WriteToExcel.WriteCell Instance: ExcelInstance Value: $'''Success''' Column: 3 Row: FirstFreeRow
+        Excel.WriteToExcel.WriteCell Instance: ExcelInstance Value: $'''-''' Column: 4 Row: FirstFreeRow
+        Excel.WriteToExcel.WriteCell Instance: ExcelInstance Value: $'''-''' Column: 5 Row: FirstFreeRow
+    END
+    Excel.CloseExcel.CloseAndSave Instance: ExcelInstance
+    SET STR_password TO $'''wvmug:viN;b=25'''
+    FTP.OpenSecureConnection.ConnectWithFtpsExplicit Host: $'''servicereport.pea.co.th''' Port: 21 ActiveMode: False Username: $'''itservicedesk''' Password: STR_password AcceptUntrustedCertificates: False Timeout: 30 SftpConnection=> SftpConnection
+    FTP.UploadFiles Connection: SftpConnection Files: $'''D:\\PEA_ServiceDesk\\Email_Status\\%Formattedyear%_Email_Status.xlsx''' RemoteLocation: $'''/Email_Status''' TransferType: FTP.FtpTransferType.Auto IfFileExists: FTP.IfFtpFileExists.Overwrite
+END
+
+================================================================================================
+Set
+===========================
+DateTime.GetCurrentDateTime.Windows DateTimeFormat: DateTime.DateTimeFormat.DateAndTime TimeZoneLocation: DateTime.TimeZoneLocation.SEAsiaStandardTime CurrentDateTime=> CurrentDateTime
+Text.ConvertDateTimeToText.FromCustomDateTime DateTime: CurrentDateTime CustomFormat: $'''dd-MM-yyyy HH:mm:ss''' Result=> dat_time
+Text.ConvertDateTimeToText.FromCustomDateTime DateTime: CurrentDateTime CustomFormat: $'''MM''' Result=> FormattedDateTime
+Text.ConvertDateTimeToText.FromCustomDateTime DateTime: CurrentDateTime CustomFormat: $'''yyyy''' Result=> Formattedyear
+Text.ToNumber Text: FormattedDateTime Number=> Month_num
+SET monthSheet TO 2
+Excel.LaunchExcel.LaunchAndOpenUnderExistingProcess Path: $'''D:\\PEA_ServiceDesk\\Template\\YYYY_Email_Status.xlsx''' Visible: False ReadOnly: False UseMachineLocale: False Instance=> ExcelInstance3
+Excel.ReadFromExcel.ReadCells Instance: ExcelInstance3 StartColumn: 1 StartRow: 1 EndColumn: 5 EndRow: 1 GetCellContentsMode: Excel.GetCellContentsMode.TypedValues FirstLineIsHeader: False RangeValue=> ExcelData2
+Excel.CloseExcel.Close Instance: ExcelInstance3
+===============================================================================================
+
+send_error
+===========================
+Workstation.TakeScreenshot.TakeScreenshotAndSaveToFile File: $'''C:\\Users\\itservicedesk\\Desktop\\error_2.1.jpg''' ImageFormat: System.ImageFormat.Jpg
+    ON ERROR
+
+    END
+ERROR => LastError
+Excel.LaunchExcel.LaunchAndOpenUnderExistingProcess Path: $'''D:\\PEA_ServiceDesk\\master_config\\config_file.xlsx''' Visible: False ReadOnly: True UseMachineLocale: False Instance=> ExcelInstance2
+Excel.ReadFromExcel.ReadCell Instance: ExcelInstance2 StartColumn: $'''B''' StartRow: 2 GetCellContentsMode: Excel.GetCellContentsMode.TypedValues CellValue=> ExcelData2
+Excel.ReadFromExcel.ReadCell Instance: ExcelInstance2 StartColumn: $'''B''' StartRow: 8 GetCellContentsMode: Excel.GetCellContentsMode.TypedValues CellValue=> ExcelData8
+Excel.CloseExcel.Close Instance: ExcelInstance2
+DateTime.GetCurrentDateTime.Windows DateTimeFormat: DateTime.DateTimeFormat.DateAndTime TimeZoneLocation: DateTime.TimeZoneLocation.SEAsiaStandardTime CurrentDateTime=> CurrentDateTime
+Text.ConvertDateTimeToText.FromCustomDateTime DateTime: CurrentDateTime CustomFormat: $'''dd/MM/yyyy HH:mm:ss''' Result=> SendmailDateTime
+Outlook.Launch Instance=> OutlookInstance
+Outlook.SendEmailThroughOutlook.SendEmail Instance: OutlookInstance Account: ExcelData8 SendTo: ExcelData2 Subject: $'''Error : Check_PEAEmail_Connection''' Body: $'''Error Check_PEAEmail_Connection
+Sent Date : %SendmailDateTime%
+Error In : 
+-- %LastError.Location%
+-- %LastError.Message%
+-- %LastError.ErrorDetails%
+''' IsBodyHtml: False IsDraft: False Attachments: $'''C:\\Users\\itservicedesk\\Desktop\\error_2.1.jpg'''
+    ON ERROR
+        SET NewVar TO 1
+    END
+IF NewVar = 1 THEN
+    Outlook.SendEmailThroughOutlook.SendEmail Instance: OutlookInstance Account: ExcelData8 SendTo: ExcelData2 Subject: $'''Error : Check_PEAEmail_Connection''' Body: $'''Error Check_PEAEmail_ConnectionRTG 
+Sent Date : %SendmailDateTime%
+Error In : 
+-- %LastError.Location%
+-- %LastError.Message%
+-- %LastError.ErrorDetails%
+''' IsBodyHtml: False IsDraft: False
+END
+WAIT 6
+Outlook.Close Instance: OutlookInstance
+File.Delete Files: $'''C:\\Users\\itservicedesk\\Desktop\\error_2.1.jpg'''
+    ON ERROR
+
+    END
+===================================================================================================

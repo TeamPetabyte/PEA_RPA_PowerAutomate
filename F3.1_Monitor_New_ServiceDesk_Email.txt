@@ -1,0 +1,86 @@
+main
+=============
+BLOCK 'error'
+ON BLOCK ERROR
+    CALL send_error
+    THROW ERROR
+END
+    Excel.LaunchExcel.LaunchAndOpenUnderExistingProcess Path: $'''D:\\PEA_ServiceDesk\\master_config\\config_file.xlsx''' Visible: False ReadOnly: False UseMachineLocale: False Instance=> ExcelInstance
+    Excel.ReadFromExcel.ReadCell Instance: ExcelInstance StartColumn: 2 StartRow: 7 GetCellContentsMode: Excel.GetCellContentsMode.TypedValues CellValue=> ExcelData
+    Excel.ReadFromExcel.ReadCell Instance: ExcelInstance StartColumn: $'''B''' StartRow: 8 GetCellContentsMode: Excel.GetCellContentsMode.TypedValues CellValue=> ExcelData8
+    Excel.CloseExcel.Close Instance: ExcelInstance
+    Outlook.Launch Instance=> OutlookInstance
+    Outlook.RetrieveEmailMessages.RetrieveEmailsAndSaveAttachments Instance: OutlookInstance Account: ExcelData8 MailFolder: $'''Waiting''' EmailsToRetrieve: Outlook.RetrieveMessagesMode.All MarkAsRead: True ReadBodyAsHtml: False SaveAttachmentsInto: $'''D:\\PEA_ServiceDesk\\temp''' Messages=> RetrievedEmails
+    Folder.GetFiles Folder: $'''D:\\PEA_ServiceDesk\\temp''' FileFilter: $'''*''' IncludeSubfolders: False FailOnAccessDenied: True SortBy1: Folder.SortBy.NoSort SortDescending1: False SortBy2: Folder.SortBy.NoSort SortDescending2: False SortBy3: Folder.SortBy.NoSort SortDescending3: False Files=> Files
+    SET num TO 0
+    LOOP FOREACH CurrentItem IN RetrievedEmails
+        DISABLE Excel.FindAndReplace.FindSingle Instance: ExcelInstance TextToFind: CurrentItem['From'] MatchCase: False MatchEntireCellContents: False SearchBy: Excel.SearchOrder.Rows FoundColumnIndex=> FoundColumnIndex FoundRowIndex=> FoundRowIndex
+        DISABLE IF FoundColumnIndex <> 0 THEN
+            DISABLE Excel.ReadFromExcel.ReadCell Instance: ExcelInstance StartColumn: 1 StartRow: FoundRowIndex GetCellContentsMode: Excel.GetCellContentsMode.TypedValues CellValue=> ExcelData1
+            DISABLE Excel.ReadFromExcel.ReadCell Instance: ExcelInstance StartColumn: 4 StartRow: FoundRowIndex GetCellContentsMode: Excel.GetCellContentsMode.TypedValues CellValue=> ExcelData2
+            DISABLE Excel.ReadFromExcel.ReadCell Instance: ExcelInstance StartColumn: 5 StartRow: FoundRowIndex GetCellContentsMode: Excel.GetCellContentsMode.TypedValues CellValue=> ExcelData3
+            DISABLE Outlook.SendEmailThroughOutlook.SendEmail Instance: OutlookInstance Account: $'''khathawut@petabyte.co.th''' SendTo: $'''khathawut.garo55555@gmail.com; soraya@petabyte.co.th''' Subject: $'''[From : %CurrentItem['From']%] %CurrentItem.Subject%''' Body: $'''%ExcelData1%_%ExcelData2%_%ExcelData3% 
+%CurrentItem.Body%''' IsBodyHtml: False IsDraft: False Attachments: RetrievedEmails[num].Attachments
+ON ERROR
+    CALL send
+END
+            DISABLE Outlook.ProcessEmailMessages.MoveEmails Instance: OutlookInstance Account: $'''itil018@pea.co.th''' EmailsToProcess: CurrentItem MailFolder: $'''Success'''
+        DISABLE END
+        DISABLE IF FoundColumnIndex = 0 THEN
+        DISABLE END
+        Outlook.SendEmailThroughOutlook.SendEmail Instance: OutlookInstance Account: ExcelData8 SendTo: ExcelData Subject: $'''[From : %CurrentItem['From']%] %CurrentItem.Subject%''' Body: CurrentItem.Body IsBodyHtml: False IsDraft: False Attachments: RetrievedEmails[num].Attachments
+        ON ERROR
+            CALL send2
+        END
+        Outlook.ProcessEmailMessages.MoveEmails Instance: OutlookInstance Account: ExcelData8 EmailsToProcess: CurrentItem MailFolder: $'''Success'''
+        Variables.IncreaseVariable Value: num IncrementValue: 1
+    END
+    File.Delete Files: Files
+    ON ERROR
+
+    END
+END
+
+=============================================================================================
+send_error
+====================
+BLOCK 'error'
+ON BLOCK ERROR
+    CALL send_error
+    THROW ERROR
+END
+    Excel.LaunchExcel.LaunchAndOpenUnderExistingProcess Path: $'''D:\\PEA_ServiceDesk\\master_config\\config_file.xlsx''' Visible: False ReadOnly: False UseMachineLocale: False Instance=> ExcelInstance
+    Excel.ReadFromExcel.ReadCell Instance: ExcelInstance StartColumn: 2 StartRow: 7 GetCellContentsMode: Excel.GetCellContentsMode.TypedValues CellValue=> ExcelData
+    Excel.ReadFromExcel.ReadCell Instance: ExcelInstance StartColumn: $'''B''' StartRow: 8 GetCellContentsMode: Excel.GetCellContentsMode.TypedValues CellValue=> ExcelData8
+    Excel.CloseExcel.Close Instance: ExcelInstance
+    Outlook.Launch Instance=> OutlookInstance
+    Outlook.RetrieveEmailMessages.RetrieveEmailsAndSaveAttachments Instance: OutlookInstance Account: ExcelData8 MailFolder: $'''Waiting''' EmailsToRetrieve: Outlook.RetrieveMessagesMode.All MarkAsRead: True ReadBodyAsHtml: False SaveAttachmentsInto: $'''D:\\PEA_ServiceDesk\\temp''' Messages=> RetrievedEmails
+    Folder.GetFiles Folder: $'''D:\\PEA_ServiceDesk\\temp''' FileFilter: $'''*''' IncludeSubfolders: False FailOnAccessDenied: True SortBy1: Folder.SortBy.NoSort SortDescending1: False SortBy2: Folder.SortBy.NoSort SortDescending2: False SortBy3: Folder.SortBy.NoSort SortDescending3: False Files=> Files
+    SET num TO 0
+    LOOP FOREACH CurrentItem IN RetrievedEmails
+        DISABLE Excel.FindAndReplace.FindSingle Instance: ExcelInstance TextToFind: CurrentItem['From'] MatchCase: False MatchEntireCellContents: False SearchBy: Excel.SearchOrder.Rows FoundColumnIndex=> FoundColumnIndex FoundRowIndex=> FoundRowIndex
+        DISABLE IF FoundColumnIndex <> 0 THEN
+            DISABLE Excel.ReadFromExcel.ReadCell Instance: ExcelInstance StartColumn: 1 StartRow: FoundRowIndex GetCellContentsMode: Excel.GetCellContentsMode.TypedValues CellValue=> ExcelData1
+            DISABLE Excel.ReadFromExcel.ReadCell Instance: ExcelInstance StartColumn: 4 StartRow: FoundRowIndex GetCellContentsMode: Excel.GetCellContentsMode.TypedValues CellValue=> ExcelData2
+            DISABLE Excel.ReadFromExcel.ReadCell Instance: ExcelInstance StartColumn: 5 StartRow: FoundRowIndex GetCellContentsMode: Excel.GetCellContentsMode.TypedValues CellValue=> ExcelData3
+            DISABLE Outlook.SendEmailThroughOutlook.SendEmail Instance: OutlookInstance Account: $'''khathawut@petabyte.co.th''' SendTo: $'''khathawut.garo55555@gmail.com; soraya@petabyte.co.th''' Subject: $'''[From : %CurrentItem['From']%] %CurrentItem.Subject%''' Body: $'''%ExcelData1%_%ExcelData2%_%ExcelData3% 
+%CurrentItem.Body%''' IsBodyHtml: False IsDraft: False Attachments: RetrievedEmails[num].Attachments
+ON ERROR
+    CALL send
+END
+            DISABLE Outlook.ProcessEmailMessages.MoveEmails Instance: OutlookInstance Account: $'''itil018@pea.co.th''' EmailsToProcess: CurrentItem MailFolder: $'''Success'''
+        DISABLE END
+        DISABLE IF FoundColumnIndex = 0 THEN
+        DISABLE END
+        Outlook.SendEmailThroughOutlook.SendEmail Instance: OutlookInstance Account: ExcelData8 SendTo: ExcelData Subject: $'''[From : %CurrentItem['From']%] %CurrentItem.Subject%''' Body: CurrentItem.Body IsBodyHtml: False IsDraft: False Attachments: RetrievedEmails[num].Attachments
+        ON ERROR
+            CALL send2
+        END
+        Outlook.ProcessEmailMessages.MoveEmails Instance: OutlookInstance Account: ExcelData8 EmailsToProcess: CurrentItem MailFolder: $'''Success'''
+        Variables.IncreaseVariable Value: num IncrementValue: 1
+    END
+    File.Delete Files: Files
+    ON ERROR
+
+    END
+END
